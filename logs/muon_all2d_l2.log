@@ -1,0 +1,96 @@
+[2026-10-23 11:27:37] [DEBUG]: Setting JobRuntime:name=UNKNOWN_NAME
+[2026-10-23 11:27:37] [DEBUG]: Setting JobRuntime:name=run_model
+/home/jovyan/.mlspace/envs/yusupov_mrgsrec/lib/python3.11/site-packages/hydra/_internal/defaults_list.py:251: UserWarning: In 'beauty_sasrec_muon2d': Defaults list is missing `_self_`. See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/default_composition_order for more information
+  warnings.warn(msg, UserWarning)
+[2026-10-23 11:27:40,271][__main__][INFO] - Training config:
+dataloader:
+  train:
+    batch_size: 128
+    drop_last: false
+    shuffle: true
+    num_workers: 0
+  validation:
+    batch_size: 256
+    drop_last: false
+    shuffle: false
+    num_workers: 0
+  test:
+    batch_size: 256
+    drop_last: false
+    shuffle: false
+    num_workers: 0
+device: cuda
+num_epochs: 200
+early_stopping_rounds: 30
+seed: 42
+metrics:
+  ndcg:
+    _target_: src.metrics.NDCGMetric
+  coverage:
+    _target_: src.metrics.CoverageMetric
+  recall:
+    _target_: src.metrics.RecallMetric
+  meanrank:
+    _target_: src.metrics.MeanRankMetric
+metrics_ks:
+- 10
+- 100
+dataset:
+  path_to_data_dir: data
+  name: reviews_Beauty_5
+  max_sequence_length: 10
+base_dir: '2026-10-23'
+model:
+  embedding_dim: 64
+  num_heads: 1
+  num_layers: 2
+  dim_feedforward: 64
+  dropout: 0.5
+  activation: gelu
+  layer_norm_eps: 1.0e-09
+  topk_k: null
+optimizer:
+  optimizer:
+    type: muon
+    lr: 0.02
+    adamw_lr: 0.0021002963516611
+    momentum: 0.95
+    nesterov: true
+    ns_steps: 5
+    weight_decay: 0.0
+    adamw_weight_decay: 0.0
+    adamw_betas:
+    - 0.9
+    - 0.999
+    adamw_eps: 1.0e-08
+    exclude_embeddings: false
+  lr_scaling:
+    type: sqrt_depth
+    reference_num_layers: 4
+  clip_grad_threshold: 10.0
+loss:
+  _target_: src.loss.LocalObjective
+model_name: sasrec
+
+
+[2026-10-23 11:27:40,272][__main__][INFO] - SELECT_EPOCH STEP
+[2026-10-23 11:27:40,279][__main__][INFO] - Current DEVICE: cuda
+/home/jovyan/.mlspace/envs/yusupov_mrgsrec/lib/python3.11/site-packages/torch/nn/modules/transformer.py:282: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.self_attn.num_heads is odd
+  warnings.warn(f"enable_nested_tensor is True, but self.use_nested_tensor is False because {why_not_sparsity_fast_path}")
+[2026-10-23 11:28:35,853][__main__][INFO] - Num params: 825856
+  0%|                                                                                                                                                                  | 0/200 [00:00<?, ?it/s]  0%|▊                                                                                                                                                       | 1/200 [00:30<1:42:31, 30.91s/it]  1%|█▌                                                                                                                                                      | 2/200 [01:05<1:49:10, 33.08s/it]  2%|██▎                                                                                                                                                     | 3/200 [01:36<1:45:01, 31.99s/it]  2%|███                                                                                                                                                     | 4/200 [02:06<1:41:49, 31.17s/it]  2%|███▊                                                                                                                                                    | 5/200 [02:32<1:35:48, 29.48s/it]  3%|████▌                                                                                                                                                   | 6/200 [02:42<1:13:27, 22.72s/it]  4%|█████▎                                                                                                                                                  | 7/200 [03:11<1:20:07, 24.91s/it]  4%|██████                                                                                                                                                  | 8/200 [03:39<1:22:51, 25.89s/it]  4%|██████▊                                                                                                                                                 | 9/200 [04:09<1:25:59, 27.02s/it]  5%|███████▌                                                                                                                                               | 10/200 [04:37<1:26:37, 27.36s/it]  6%|████████▎                                                                                                                                              | 11/200 [05:05<1:27:21, 27.73s/it]  6%|█████████                                                                                                                                              | 12/200 [05:35<1:28:23, 28.21s/it]  6%|█████████▊                                                                                                                                             | 13/200 [06:00<1:25:17, 27.37s/it]  7%|██████████▌                                                                                                                                            | 14/200 [06:28<1:25:02, 27.43s/it]  8%|███████████▎                                                                                                                                           | 15/200 [06:56<1:25:17, 27.66s/it]  8%|████████████                                                                                                                                           | 16/200 [07:24<1:25:14, 27.80s/it]  8%|████████████▊                                                                                                                                          | 17/200 [07:51<1:23:58, 27.53s/it]  9%|█████████████▌                                                                                                                                         | 18/200 [08:18<1:23:16, 27.45s/it] 10%|██████████████▎                                                                                                                                        | 19/200 [08:47<1:24:08, 27.89s/it] 10%|███████████████                                                                                                                                        | 20/200 [09:16<1:25:00, 28.34s/it] 10%|███████████████▊                                                                                                                                       | 21/200 [09:43<1:23:00, 27.83s/it] 11%|████████████████▌                                                                                                                                      | 22/200 [10:10<1:21:22, 27.43s/it] 12%|█████████████████▎                                                                                                                                     | 23/200 [10:37<1:20:47, 27.39s/it] 12%|██████████████████                                                                                                                                     | 24/200 [11:06<1:22:06, 27.99s/it] 12%|██████████████████▉                                                                                                                                    | 25/200 [11:17<1:06:14, 22.71s/it] 13%|███████████████████▋                                                                                                                                   | 26/200 [11:44<1:09:30, 23.97s/it] 14%|████████████████████▍                                                                                                                                  | 27/200 [12:10<1:11:28, 24.79s/it] 14%|█████████████████████▏                                                                                                                                 | 28/200 [12:36<1:12:06, 25.15s/it] 14%|█████████████████████▉                                                                                                                                 | 29/200 [13:03<1:12:48, 25.55s/it] 15%|██████████████████████▋                                                                                                                                | 30/200 [13:28<1:12:16, 25.51s/it] 16%|███████████████████████▍                                                                                                                               | 31/200 [13:54<1:12:21, 25.69s/it] 16%|████████████████████████▏                                                                                                                              | 32/200 [14:21<1:13:01, 26.08s/it] 16%|████████████████████████▉                                                                                                                              | 33/200 [14:48<1:12:55, 26.20s/it] 17%|█████████████████████████▋                                                                                                                             | 34/200 [15:12<1:11:09, 25.72s/it] 18%|██████████████████████████▍                                                                                                                            | 35/200 [15:38<1:10:33, 25.66s/it] 18%|███████████████████████████▏                                                                                                                           | 36/200 [16:01<1:08:02, 24.89s/it] 18%|███████████████████████████▉                                                                                                                           | 37/200 [16:26<1:07:22, 24.80s/it] 19%|████████████████████████████▋                                                                                                                          | 38/200 [16:51<1:07:26, 24.98s/it] 20%|█████████████████████████████▍                                                                                                                         | 39/200 [17:15<1:06:39, 24.84s/it] 20%|██████████████████████████████▏                                                                                                                        | 40/200 [17:40<1:06:06, 24.79s/it] 20%|██████████████████████████████▉                                                                                                                        | 41/200 [18:06<1:06:16, 25.01s/it] 21%|███████████████████████████████▋                                                                                                                       | 42/200 [18:31<1:06:28, 25.24s/it] 22%|████████████████████████████████▍                                                                                                                      | 43/200 [18:52<1:02:04, 23.72s/it] 22%|████████████████████████████████▍                                                                                                                      | 43/200 [19:02<1:09:32, 26.58s/it]
+No more improve in 30 epoch
+Total time: 1142.8938949108124
+Best metrics: 
+{'val/ndcg@10': 0.006025224198739995, 'val/coverage@10': 0.0025617717544004627, 'val/recall@10': 0.011851851851851851, 'val/meanrank@10': 0.0, 'val/ndcg@100': 0.014678811598076392, 'val/coverage@100': 0.01851086687050657, 'val/recall@100': 0.0582010582010582, 'val/meanrank@100': 0.0, 'val/ndcg@10_group0': 0.047847368637052905, 'val/ndcg@10_group1': 0.0, 'val/ndcg@10_group2': 0.0, 'val/coverage@10_group0': 0.0023138583588133213, 'val/coverage@10_group1': 0.0023964961573423684, 'val/coverage@10_group2': 0.0024791339558714156, 'val/recall@10_group0': 0.09411764705882353, 'val/recall@10_group1': 0.0, 'val/recall@10_group2': 0.0, 'val/meanrank@10mean_rank': 10.924232804232805, 'val/meanrank@10mean_rank_group0': 10.398319327731093, 'val/meanrank@10mean_rank_group1': 11.0, 'val/meanrank@10mean_rank_group2': 11.0, 'val/ndcg@100_group0': 0.11604396976342722, 'val/ndcg@100_group1': 0.0002798766112156052, 'val/ndcg@100_group2': 0.0, 'val/coverage@100_group0': 0.018345591273448477, 'val/coverage@100_group1': 0.01826295347491943, 'val/coverage@100_group2': 0.018428229071977522, 'val/recall@100_group0': 0.4588235294117647, 'val/recall@100_group1': 0.0017985611510791368, 'val/recall@100_group2': 0.0, 'val/meanrank@100mean_rank': 97.5405291005291, 'val/meanrank@100mean_rank_group0': 73.58151260504202, 'val/meanrank@100mean_rank_group1': 100.97122302158273, 'val/meanrank@100mean_rank_group2': 101.0, 'test/ndcg@10': 0.003994608556226539, 'test/coverage@10': 0.0025617717544004627, 'test/recall@10': 0.008332296977987812, 'test/meanrank@10': 0.0, 'test/ndcg@100': 0.010275262673537747, 'test/coverage@100': 0.018841418064622757, 'test/recall@100': 0.04215893545578908, 'test/meanrank@100': 0.0, 'test/ndcg@10_group0': 0.03709081685983556, 'test/ndcg@10_group1': 0.0, 'test/ndcg@10_group2': 0.0, 'test/coverage@10_group0': 0.0023964961573423684, 'test/coverage@10_group1': 0.0023964961573423684, 'test/coverage@10_group2': 0.0025617717544004627, 'test/recall@10_group0': 0.07736720554272518, 'test/recall@10_group1': 0.0, 'test/recall@10_group2': 0.0, 'test/meanrank@10mean_rank': 10.947145877378436, 'test/meanrank@10mean_rank_group0': 10.509237875288683, 'test/meanrank@10mean_rank_group1': 11.0, 'test/meanrank@10mean_rank_group2': 11.0, 'test/ndcg@100_group0': 0.09540806831168247, 'test/ndcg@100_group1': 0.0, 'test/ndcg@100_group2': 0.0, 'test/coverage@100_group0': 0.01818031567639038, 'test/coverage@100_group1': 0.01826295347491943, 'test/coverage@100_group2': 0.018758780266093712, 'test/recall@100_group0': 0.39145496535796764, 'test/recall@100_group1': 0.0, 'test/recall@100_group2': 0.0, 'test/meanrank@100mean_rank': 98.56162168884467, 'test/meanrank@100mean_rank_group0': 78.35912240184757, 'test/meanrank@100mean_rank_group1': 101.0, 'test/meanrank@100mean_rank_group2': 101.0, 'train_time': 1142.8938949108124, 'best_epoch': 12}
+✅ Saved 35 plots to /home/jovyan/Yusupov/multirepr_paper_1/Baseline/sasrec_experiments/outputs/muon_all2d_l2/only_train
+[2026-10-23 11:49:55,452][__main__][INFO] - REFIT STEP
+[2026-10-23 11:49:55,455][__main__][INFO] - Current DEVICE: cuda
+/home/jovyan/.mlspace/envs/yusupov_mrgsrec/lib/python3.11/site-packages/torch/nn/modules/transformer.py:282: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.self_attn.num_heads is odd
+  warnings.warn(f"enable_nested_tensor is True, but self.use_nested_tensor is False because {why_not_sparsity_fast_path}")
+[2026-10-23 11:50:03,483][__main__][INFO] - Num params: 825856
+  0%|                                                                                                                                                                   | 0/12 [00:00<?, ?it/s]  8%|████████████▉                                                                                                                                              | 1/12 [00:23<04:20, 23.70s/it] 17%|█████████████████████████▊                                                                                                                                 | 2/12 [00:45<03:47, 22.70s/it] 25%|██████████████████████████████████████▊                                                                                                                    | 3/12 [01:07<03:19, 22.20s/it] 33%|███████████████████████████████████████████████████▋                                                                                                       | 4/12 [01:26<02:47, 20.89s/it] 42%|████████████████████████████████████████████████████████████████▌                                                                                          | 5/12 [01:46<02:24, 20.65s/it] 50%|█████████████████████████████████████████████████████████████████████████████▌                                                                             | 6/12 [02:02<01:55, 19.17s/it] 58%|██████████████████████████████████████████████████████████████████████████████████████████▍                                                                | 7/12 [02:22<01:36, 19.31s/it] 67%|███████████████████████████████████████████████████████████████████████████████████████████████████████▎                                                   | 8/12 [02:41<01:17, 19.34s/it] 75%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▎                                      | 9/12 [03:00<00:57, 19.26s/it] 83%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▎                         | 10/12 [03:20<00:38, 19.25s/it] 92%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▏            | 11/12 [03:40<00:19, 19.63s/it]100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 12/12 [03:59<00:00, 19.53s/it]100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 12/12 [03:59<00:00, 19.98s/it]
+Total time: 239.81045961380005
+Best metrics: 
+{'train_time': 239.81045961380005, 'best_epoch': 0}
+✅ Saved 35 plots to /home/jovyan/Yusupov/multirepr_paper_1/Baseline/sasrec_experiments/outputs/muon_all2d_l2/train_val

@@ -1,0 +1,127 @@
+defaults:
+  - dataloader
+  - general
+  - metrics
+  - dataset: beauty
+
+dataloader:
+  train:
+    batch_size: 128
+
+hydra:
+  run:
+    dir: outputs/${base_dir}/${model_name}__${dataset.name}__stackrec__${now:%H-%M-%S}
+
+base_dir: ${now:%Y-%m-%d}
+
+model:
+  # sasrec
+  embedding_dim: 64
+  num_heads: 1
+  # StackRec is applied to the full 6-layer model.
+  num_layers: 6
+  dim_feedforward: 64
+  dropout: 0.5
+  # other
+  activation: gelu
+  layer_norm_eps: 1.0e-09
+  topk_k: null
+
+optimizer:
+  type: adamw
+  # stage-wise lr is specified in stackrec.stages
+  weight_decay: 0.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  clip_grad_threshold: 10.0
+
+stackrec:
+  # lr(L) = lr_ref * sqrt(reference_num_layers / L)
+  reference_lr: 0.0021002963516611
+  reference_num_layers: 4
+
+  # Auxiliary identity loss at the stacking boundary.
+  # When a new group of layers is added below the trained subnet, the last
+  # layer of that group gets a trainable output scalar. The loss drives
+  #   mean ||scalar * output_of_new_group - input_to_new_group||^2
+  #        / ||input_to_new_group||^2  ->  0,
+  # i.e. the output/input vector ratio goes to 1. Its coefficient follows
+  # the linear-complement relation
+  #   alpha + lambda / lambda0 = 1  =>  lambda(alpha) = lambda0 * (1 - alpha),
+  # where alpha is the new-group forward scale ramped from 0 to 1.
+  aux_identity:
+    enabled: true
+    initial_coeff: 1.0
+    power: 1.0  # 1.0 = linear law; <1 decays slower, >1 decays faster
+    eps: 1.0e-8
+    scalar_init: 1.0
+
+  # Optional hyperbolic next-item head at the output of each newly stacked
+  # group. The head maps the boundary hidden state and the item embeddings to
+  # a Poincare ball of curvature -c and adds a CE loss over hyperbolic
+  # distances. Curvature schedule:
+  #   c(depth) = c_ref * (depth_ref / depth) ** power
+  # with depth measured from the input. Thus curvature decreases (the ball
+  # becomes flatter / larger) for deeper heads; power=2 is the conservative
+  # default, power=1 is a slower decay, schedule=constant disables the decay.
+  hyperbolic_heads:
+    enabled: false
+    schedule: inverse_power  # inverse_power | constant
+    depth_mode: absolute  # absolute | cumulative | active_prefix
+    reference_curvature: 1.0
+    reference_depth: 2
+    power: 2.0
+    learnable_curvature: true
+    distance: squared  # squared | plain
+    temperature: 0.03
+    loss_coeff: 0.03
+    warmup: true
+    freeze_previous: true
+
+  # Progressive stacking for a 6-layer SASRec.
+  # Layer indices are zero-based. At every stage the layers listed in
+  # `active_layers` are trainable; the other layers are frozen and their
+  # forward coefficient (`final_scales`) is 0, so they act as identity.
+  #
+  # Stage 1: only the last two layers (4, 5) are active.
+  # Stage 2: weights of layers 4, 5 are copied into layers 2, 3; layers 2-5
+  #          are then trained, with the coefficient of layers 2, 3 ramped
+  #          from 0 to 1.
+  # Stage 3: weights of the middle two layers (2, 3) are copied into layers
+  #          0, 1; all six layers are then trained, with the coefficient of
+  #          layers 0, 1 ramped from 0 to 1.
+  stages:
+    - name: "2_layers"
+      active_layers: [4, 5]
+      new_layers: []
+      final_scales: [0.0, 0.0, 0.0, 0.0, 1.0, 1.0]
+      copy_layers: []
+      lr: 0.0029702675855218593
+      epochs: 90
+      ramp_epochs: 0
+
+    - name: "4_layers"
+      active_layers: [2, 3, 4, 5]
+      new_layers: [2, 3]
+      final_scales: [0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+      copy_layers: [[4, 2], [5, 3]]
+      lr: 0.0021002963516611
+      epochs: 60
+      ramp_epochs: 10
+
+    - name: "6_layers"
+      active_layers: [0, 1, 2, 3, 4, 5]
+      new_layers: [0, 1]
+      final_scales: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      copy_layers: [[2, 0], [3, 1]]
+      lr: 0.0017148847900662653
+      epochs: 60
+      ramp_epochs: 10
+
+  results_path: sasrec_stackrec_results.json
+  history_path: stackrec_history.json
+
+loss:
+  _target_: src.loss.LocalObjective
+
+model_name: sasrec

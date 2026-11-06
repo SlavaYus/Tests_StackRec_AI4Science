@@ -1,0 +1,324 @@
+SASRec-only experiments on Beauty
+=================================
+
+Папка содержит только код, необходимый для запуска SASRec на датасете Beauty.
+Конфигурация: configs/beauty_sasrec.yaml (оптимальный конфиг SASRec).
+Во всех экспериментах меняется только число слоёв: model.num_layers = 2, 4, 6.
+Остальные гиперпараметры не изменяются.
+
+1. Окружение
+------------
+Проверенное окружение:
+    /home/jovyan/.mlspace/envs/yusupov_mrgsrec/bin/python
+
+Активация (любой из вариантов):
+    source /home/user/conda/etc/profile.d/conda.sh
+    conda activate /home/jovyan/.mlspace/envs/yusupov_mrgsrec
+
+или запуск напрямую:
+    /home/jovyan/.mlspace/envs/yusupov_mrgsrec/bin/python ...
+
+Необходимые пакеты: torch, pandas, numpy, hydra-core, omegaconf, tqdm,
+matplotlib, seaborn.
+
+2. Переход в папку
+------------------
+    cd /home/jovyan/Yusupov/multirepr_paper_1/Baseline/sasrec_experiments
+
+3. Запуск одного эксперимента
+-----------------------------
+    python run_model.py -cn beauty_sasrec model.num_layers=2 \
+        hydra.run.dir=outputs/beauty_sasrec_l2 hydra.job.chdir=false
+
+Для 4 и 6 слоёв замените 2 на 4 или 6 в model.num_layers и в hydra.run.dir.
+
+Примечание: hydra.job.chdir=false обязателен, чтобы относительный путь к data/
+оставался корректным.
+
+4. Запуск всех трёх экспериментов (2, 4, 6 слоёв)
+-------------------------------------------------
+    for L in 2 4 6; do
+        CUDA_VISIBLE_DEVICES=0 python run_model.py -cn beauty_sasrec \
+            model.num_layers=$L \
+            hydra.run.dir=outputs/beauty_sasrec_l${L} \
+            hydra.job.chdir=false
+    done
+
+Для параллельного запуска на разных GPU:
+    CUDA_VISIBLE_DEVICES=0 python run_model.py -cn beauty_sasrec model.num_layers=2 hydra.run.dir=outputs/beauty_sasrec_l2 hydra.job.chdir=false &
+    CUDA_VISIBLE_DEVICES=1 python run_model.py -cn beauty_sasrec model.num_layers=4 hydra.run.dir=outputs/beauty_sasrec_l4 hydra.job.chdir=false &
+    CUDA_VISIBLE_DEVICES=2 python run_model.py -cn beauty_sasrec model.num_layers=6 hydra.run.dir=outputs/beauty_sasrec_l6 hydra.job.chdir=false &
+    wait
+
+5. Где лежат результаты
+-----------------------
+Для каждого числа слоёв L создаётся папка:
+    outputs/beauty_sasrec_lL/
+
+В ней:
+    select_epoch_best_metrics.json - лучшие validation-метрики на этапе выбора эпохи
+    refit_best_metrics.json        - итоговые test-метрики после refit
+    refit_all_metrics.json         - метрики по эпохам после refit
+    select_epoch_all_metrics.json  - метрики по эпохам на этапе выбора эпохи
+    config.yaml                    - полный конфиг запуска
+
+Сводный файл по всем трём запускам:
+    sasrec_layers_results.json
+
+6. Данные
+---------
+Используются только данные Beauty:
+    data/reviews_Beauty_5.csv
+    data/global_split/reviews_Beauty_5/{train,validation,train_validation,test}.csv
+
+7. Структура кода
+-----------------
+    run_model.py              - запуск обучения и оценки SASRec
+    src/dataset.py            - подготовка последовательностей и батчей SASRec
+    src/models/sequence.py    - модель SequentialEncoder (SASRec)
+    src/loss.py               - LocalObjective (CrossEntropy)
+    src/metrics.py            - метрики
+    src/optimizer.py          - оптимизатор
+    src/utils.py              - обучение, логирование, сохранение результатов
+    configs/                  - конфигурация beauty_sasrec и её зависимости
+
+Depth LR scaling + Muon (experiments)
+=====================================
+- With increase of number of layers L, lr scaled as lr(L)=lr_ref*sqrt(4/L).
+- Optimizers:
+  1) adamw: AdamW for all parameters, lr_ref=0.0021002963516611
+  2) muon_all2d: Muon for all 2D parameters, AdamW for 1D parameters, lr_ref=0.02 for Muon, 0.0021002963516611 for AdamW
+  3) muon_split: Muon for 2D hidden weights (excluding embeddings), AdamW for 1D weights and embeddings, lr_ref=0.02 for Muon, 0.0021002963516611 for AdamW
+- Runs: model.num_layers in {2,4,6}, configs beauty_sasrec_adamw.yaml / beauty_sasrec_muon.yaml / beauty_sasrec_muon2d.yaml
+- Outputs: outputs/adamw_l{2,4,6}, outputs/muon_all2d_l{2,4,6}, outputs/muon_l{2,4,6}
+- Collected: sasrec_depth_lr_results.json
+
+AdamW + StackRec (progressive 6-layer stacking)
+==============================================
+Config: configs/beauty_sasrec_stackrec.yaml
+Script: run_stackrec.py
+
+The model always has 6 transformer layers. Per-layer forward coefficients
+(layer scales) switch layers on/off; a zero coefficient makes a layer an
+identity. The run is one continuous training process:
+  1) train last 2 layers (layers 4,5), other layers frozen with scale 0;
+  2) copy 4->2, 5->3, train layers 2-5, ramp scales of layers 2,3 from 0 to 1;
+  3) copy 2->0, 3->1, train all layers, ramp scales of layers 0,1 from 0 to 1.
+Each stage uses a smaller AdamW LR (depth scaling lr ~ sqrt(4/L)).
+
+Run:
+    CUDA_VISIBLE_DEVICES=0 python run_stackrec.py \
+        -cn beauty_sasrec_stackrec \
+        hydra.run.dir=outputs/stackrec_adamw \
+        hydra.job.chdir=false
+
+Outputs:
+    outputs/stackrec_adamw/stackrec_results.json  - stage summaries + config
+    outputs/stackrec_adamw/stackrec_history.json  - per-epoch metrics/scales
+    outputs/stackrec_adamw/{2,4,6}_layers_best_metrics.json
+    sasrec_stackrec_results.json                  - aggregated results
+
+Muon + StackRec (progressive 6-layer stacking)
+==============================================
+Config: configs/beauty_sasrec_stackrec_muon.yaml
+Script: run_stackrec.py (optimizer.type=muon)
+
+Same StackRec schedule as the AdamW variant. Muon optimizes 2D hidden
+weights; embeddings and 1D parameters use AdamW. Stage LRs are depth-scaled:
+  Muon:  lr(L) = 0.02 * sqrt(4/L)
+  AdamW: lr(L) = 0.0021002963516611 * sqrt(4/L)
+
+Run:
+    CUDA_VISIBLE_DEVICES=0 python run_stackrec.py \
+        -cn beauty_sasrec_stackrec_muon \
+        hydra.run.dir=outputs/stackrec_muon \
+        hydra.job.chdir=false
+
+Outputs:
+    outputs/stackrec_muon/stackrec_results.json
+    outputs/stackrec_muon/stackrec_muon_history.json
+    outputs/stackrec_muon/{2,4,6}_layers_best_metrics.json
+    sasrec_stackrec_muon_results.json
+
+StackRec boundary identity auxiliary loss
+=========================================
+Both StackRec configs now enable `stackrec.aux_identity`.
+
+When a new 2-layer group is added below the trained subnet:
+- the output scalar of the last layer of that group becomes trainable
+  (`_layer_aux_scalars` in src/models/sequence.py);
+- an auxiliary loss drives the relative difference between the new lower
+  group output g*y and the pretrained-subnet input x to zero, i.e. the
+  vector ratio g*y / x to 1 (loss = mean ||g*y - x||^2 / ||x||^2);
+- its weight follows the linear-complement law
+      lambda(alpha) = lambda0 * (1 - alpha)
+  where alpha is the forward scale of the new group ramped from 0 to 1.
+  Therefore lambda decays linearly to zero as alpha grows.
+
+Config knobs:
+    stackrec.aux_identity.enabled       # true/false
+    stackrec.aux_identity.initial_coeff # lambda0 (default 1.0)
+    stackrec.aux_identity.power         # 1.0 = linear law; <1 slower, >1 faster
+    stackrec.aux_identity.eps           # denominator epsilon
+    stackrec.aux_identity.scalar_init   # initial boundary scalar (1.0)
+
+Because `aux_identity.enabled: true` is now the default, the commands in the
+plain StackRec sections above would run the aux variant and overwrite the
+plain aggregated files. Use explicit overrides:
+
+Aux run (AdamW):
+    CUDA_VISIBLE_DEVICES=0 python run_stackrec.py \
+        -cn beauty_sasrec_stackrec \
+        hydra.run.dir=outputs/stackrec_adamw_aux \
+        hydra.job.chdir=false \
+        stackrec.results_path=sasrec_stackrec_aux_results.json \
+        stackrec.history_path=stackrec_aux_history.json
+
+Aux run (Muon):
+    CUDA_VISIBLE_DEVICES=0 python run_stackrec.py \
+        -cn beauty_sasrec_stackrec_muon \
+        hydra.run.dir=outputs/stackrec_muon_aux \
+        hydra.job.chdir=false \
+        stackrec.results_path=sasrec_stackrec_muon_aux_results.json \
+        stackrec.history_path=stackrec_muon_aux_history.json
+
+Plain StackRec reproduction (disable aux, AdamW; use the Muon config for
+Muon):
+    CUDA_VISIBLE_DEVICES=0 python run_stackrec.py \
+        -cn beauty_sasrec_stackrec \
+        hydra.run.dir=outputs/stackrec_adamw_plain \
+        hydra.job.chdir=false \
+        stackrec.aux_identity.enabled=false \
+        stackrec.results_path=sasrec_stackrec_plain_results.json \
+        stackrec.history_path=stackrec_plain_history.json
+
+History/summary files additionally contain `aux_alpha`, `aux_loss_coeff`,
+`layer_aux_scalars`, train rec/aux losses and the measured identity ratio.
+
+Comparison tables with plain StackRec are in `diary.md`, entry
+"Experiment: auxiliary-loss StackRec vs plain StackRec (full runs)".
+
+Hyperbolic heads on StackRec group boundaries
+=============================================
+
+Config: configs/beauty_sasrec_stackrec_hyperbolic.yaml
+Script: run_stackrec.py (unchanged entry point)
+
+A Poincare-ball next-item head is attached to the output of each group that
+StackRec actually adds (stage 4 layers -> layer 3, stage 6 layers -> layer 1).
+The first 2-layer stage has no head, so it is identical to plain StackRec.
+The head maps the boundary state and the item table through expmap0 and adds
+a cross-entropy over negative hyperbolic distances:
+    logits = -scale * d_c(z, v)        (or -scale * d_c(z, v)^2)
+Curvatures follow
+    c(d) = c_ref * (d_ref / d) ** power,
+with d the absolute head depth (layer_index + 1).  This makes curvature
+decrease as the model gets deeper: c ~ 1/L^2 for power=2, c ~ 1/L for
+power=1.  The ball radius 1/sqrt(c) therefore grows with depth, which avoids
+boundary saturation when more layers are stacked.  Set
+`stackrec.hyperbolic_heads.depth_mode=cumulative` to tie c to the number of
+active layers in the stage (L=2,4,6) instead.
+
+Main knobs (all under stackrec.hyperbolic_heads):
+    enabled              # false in the two original configs, true in this one
+    schedule             # inverse_power | constant
+    depth_mode           # absolute | cumulative | active_prefix
+    reference_curvature  # c_ref (default 1.0)
+    reference_depth      # d_ref (default 2)
+    power                # p in c = c_ref * (d_ref/d)^p (default 2.0)
+    learnable_curvature  # learn c through softplus, scheduled value is init
+    loss_coeff           # weight of the hyperbolic CE (default 0.1)
+    warmup               # scale the coefficient by the new-group ramp alpha
+    freeze_previous      # freeze old heads; they still give deep supervision
+
+Run:
+    CUDA_VISIBLE_DEVICES=0 python run_stackrec.py \
+        -cn beauty_sasrec_stackrec_hyperbolic \
+        hydra.run.dir=outputs/stackrec_hyperbolic \
+        hydra.job.chdir=false
+
+Outputs:
+    outputs/stackrec_hyperbolic/stackrec_results.json
+    outputs/stackrec_hyperbolic/stackrec_hyperbolic_history.json
+    outputs/stackrec_hyperbolic/{2,4,6}_layers_best_metrics.json
+    sasrec_stackrec_hyperbolic_results.json
+    logs/stackrec_hyperbolic.log
+
+The history/summary additionally record the head layer, depth, scheduled and
+learned curvatures, the loss coefficient and the per-head hyperbolic loss.
+
+Lorentz hyperbolic residual on StackRec group boundaries
+========================================================
+
+Config: configs/beauty_sasrec_stackrec_hyperbolic_residual.yaml
+Script: run_stackrec.py (unchanged entry point)
+
+Starting from the first copy operation (stage 4 layers -> copy 4->2, 5->3),
+a Lorentz/hyperboloid residual head is attached to the output of every copied
+group:
+  - stage 4 layers: head on layer 3 (the first copied group);
+  - stage 6 layers: head on layer 1 (the second copied group); the layer-3
+    head is kept with its final curvature 0.2.
+
+The head has two outputs:
+  1. Lorentz item logits (negative squared/plain distance on the hyperboloid),
+     used for the usual auxiliary next-item cross-entropy;
+  2. a Euclidean residual r = (sinhc(sqrt(c) ||u||) - 1) * W_out u, u = W_in h.
+     This is the curvature-induced correction of the Lorentz exponential map,
+     so r is exactly zero at c = 0.
+
+Residual introduction (norm-preserving):
+  h_out = normalize( h + gate * normalize_to_norm(h, r) )
+with both `normalize` operations using ||h||.  Therefore:
+  - at gate = 0 the boundary state is returned bitwise unchanged, so a newly
+    stacked group reproduces the pretrained subnet exactly;
+  - for any gate the norm of the representation entering the pretrained subnet
+    is exactly ||h||, i.e. the input norms before/after stacking match.
+
+Schedules (stage-local epochs):
+  - residual gate: 0 -> 1 over `residual_ramp_epochs` (epoch 0 is exactly 0);
+  - curvature:     0 -> target over `curvature_ramp_epochs` (epoch 0 is 0).
+  - first copy:   target c = 0.2;
+  - second copy:  target c = 1.0.
+  The auxiliary CE coefficient is `loss_coeff * gate` while `warmup=true`.
+
+Config knobs (stackrec.hyperbolic_residual):
+    enabled                  # true in the new config
+    distance                 # squared | plain
+    temperature              # initial logit scale
+    loss_coeff               # weight of the Lorentz CE (0 disables the CE)
+    warmup                   # scale CE weight by the residual gate
+    freeze_previous          # freeze earlier Lorentz heads
+    learnable_curvature      # learn c through softplus (ramp overwrites it)
+    residual_ramp_epochs     # gate ramp length (default = stage ramp_epochs)
+    curvature_ramp_epochs    # curvature ramp length
+    default_curvature_target # fallback target
+    curvature_targets        # per-stage targets, e.g. {4_layers: 0.2, 6_layers: 1.0}
+
+The old Poincare heads (`stackrec.hyperbolic_heads`) remain independent and
+are disabled in this config.
+
+Run:
+    CUDA_VISIBLE_DEVICES=0 python run_stackrec.py \
+        -cn beauty_sasrec_stackrec_hyperbolic_residual \
+        hydra.run.dir=outputs/stackrec_hyperbolic_residual \
+        hydra.job.chdir=false
+
+Outputs:
+    outputs/stackrec_hyperbolic_residual/stackrec_results.json
+    outputs/stackrec_hyperbolic_residual/stackrec_hyperbolic_residual_history.json
+    outputs/stackrec_hyperbolic_residual/{2,4,6}_layers_best_metrics.json
+    sasrec_stackrec_hyperbolic_residual_results.json
+
+History/summary record, per epoch and per head: curvature target/current,
+curvature fraction, residual gate, gate of every active head, all Lorentz
+curvatures and the hyperbolic CE loss. `best_complete_*` selection also
+requires the new head's gate and curvature ramps to be complete.
+
+Verification (short smoke run, 2/3/3 epochs, ramps of 2 epochs):
+  - stage starts reproduce the previous best exactly (val ndcg@10 continuity);
+  - gate/c curvature logs: stage 4 -> (0, 0), (0.5, 0.1), (1, 0.2);
+    stage 6 -> (0, 0), (0.5, 0.5), (1, 1.0);
+  - the layer-3 head remains at c = 0.2 during the 6-layer stage;
+  - model-level checks: gate=0 is a bitwise identity, residual is exactly
+    zero at c=0, and ||h_out|| = ||h|| for every gate.

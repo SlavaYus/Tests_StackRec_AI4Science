@@ -1,0 +1,40 @@
+defaults:
+  - beauty_sasrec_stackrec
+  - _self_
+
+hydra:
+  run:
+    dir: outputs/${base_dir}/${model_name}__${dataset.name}__stackrec_hyperbolic_residual__${now:%H-%M-%S}
+
+stackrec:
+  # The Poincare-ball heads and the Lorentz residual heads are independent.
+  hyperbolic_heads:
+    enabled: false
+
+  # Lorentz/hyperboloid residual at every copied group boundary.
+  # The residual is exactly zero at c=0, is multiplied by a gate that ramps
+  # 0 -> 1, its norm is matched to the boundary state, and the sum is
+  # renormalised back to the boundary norm.  Therefore stacking reproduces the
+  # pretrained subnet exactly at the start of a stage.
+  hyperbolic_residual:
+    enabled: true
+    distance: squared  # squared | plain
+    temperature: 0.1
+    loss_coeff: 0.1
+    warmup: true
+    freeze_previous: true
+    learnable_curvature: false
+    # Linear ramps measured in stage-local epochs; epoch 0 has gate = c = 0.
+    residual_ramp_epochs: 10
+    curvature_ramp_epochs: 10
+    default_curvature_target: 1.0
+    # First copy (4 layers): head on layer 3, c: 0 -> 0.2.
+    # Second copy (6 layers): head on layer 1, c: 0 -> 1.0.
+    curvature_targets:
+      4_layers: 0.2
+      6_layers: 1.0
+
+  # Separate aggregated outputs so the plain / aux / Poincare runs stay
+  # untouched.
+  results_path: sasrec_stackrec_hyperbolic_residual_results.json
+  history_path: stackrec_hyperbolic_residual_history.json

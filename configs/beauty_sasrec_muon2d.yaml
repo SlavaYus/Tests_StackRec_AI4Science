@@ -1,0 +1,50 @@
+defaults:
+  - dataloader
+  - general
+  - metrics
+  - dataset: beauty
+
+dataloader:
+  train:
+    batch_size: 128
+
+hydra:
+  run:
+    dir: outputs/${base_dir}/${model_name}__${dataset.name}__${now:%H-%M-%S}
+
+base_dir: ${now:%Y-%m-%d}
+
+model:
+  embedding_dim: 64
+  num_heads: 1
+  num_layers: 4
+  dim_feedforward: 64
+  dropout: 0.5
+  activation: gelu
+  layer_norm_eps: 1.0e-09
+  topk_k: null
+
+optimizer:
+  optimizer:
+    # Literal split: every 2D weight (including embeddings) -> Muon,
+    # every 1D weight -> AdamW.
+    type: muon
+    lr: 0.02
+    adamw_lr: 0.0021002963516611
+    momentum: 0.95
+    nesterov: true
+    ns_steps: 5
+    weight_decay: 0.0
+    adamw_weight_decay: 0.0
+    adamw_betas: [0.9, 0.999]
+    adamw_eps: 1.0e-08
+    exclude_embeddings: false
+  lr_scaling:
+    type: sqrt_depth
+    reference_num_layers: 4
+  clip_grad_threshold: 10.0
+
+loss:
+  _target_: src.loss.LocalObjective
+
+model_name: sasrec

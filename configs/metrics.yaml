@@ -1,0 +1,17 @@
+metrics:
+  ndcg:
+    _target_: src.metrics.NDCGMetric
+  coverage:
+    _target_: src.metrics.CoverageMetric
+  recall:
+    _target_: src.metrics.RecallMetric
+  meanrank:
+    _target_: src.metrics.MeanRankMetric
+    
+  # novelty:
+  #   _target_: src.metrics.NoveltyMetric
+  # diversity:
+  #   _target_: src.metrics.ILDMetric
+
+
+metrics_ks: [10, 100]

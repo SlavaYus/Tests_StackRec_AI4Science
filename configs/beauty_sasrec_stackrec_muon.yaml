@@ -1,0 +1,116 @@
+defaults:
+  - dataloader
+  - general
+  - metrics
+  - dataset: beauty
+
+dataloader:
+  train:
+    batch_size: 128
+
+hydra:
+  run:
+    dir: outputs/${base_dir}/${model_name}__${dataset.name}__stackrec_muon__${now:%H-%M-%S}
+
+base_dir: ${now:%Y-%m-%d}
+
+model:
+  # sasrec
+  embedding_dim: 64
+  num_heads: 1
+  # StackRec is applied to the full 6-layer model.
+  num_layers: 6
+  dim_feedforward: 64
+  dropout: 0.5
+  # other
+  activation: gelu
+  layer_norm_eps: 1.0e-09
+  topk_k: null
+
+optimizer:
+  type: muon
+  # 2D hidden weights -> Muon, embeddings and 1D weights -> AdamW.
+  momentum: 0.95
+  nesterov: true
+  ns_steps: 5
+  weight_decay: 0.0
+  exclude_embeddings: true
+  adamw_weight_decay: 0.0
+  adamw_betas: [0.9, 0.999]
+  adamw_eps: 1.0e-08
+  clip_grad_threshold: 10.0
+
+stackrec:
+  # lr(L) = lr_ref * sqrt(reference_num_layers / L)
+  muon_lr_ref: 0.02
+  adamw_lr_ref: 0.0021002963516611
+  reference_num_layers: 4
+
+  # Auxiliary identity loss at the stacking boundary (same schedule as the
+  # AdamW variant). It drives mean ||g*y - x||^2 / ||x||^2 -> 0, i.e. the
+  # output/input vector ratio -> 1. lambda(alpha) = lambda0 * (1 - alpha)
+  # with alpha the forward scale of the newly added group ramped 0 -> 1.
+  aux_identity:
+    enabled: true
+    initial_coeff: 1.0
+    power: 1.0
+    eps: 1.0e-8
+    scalar_init: 1.0
+
+  # Optional hyperbolic next-item head at the output of each newly stacked
+  # group; same semantics and curvature schedule as the AdamW config.
+  hyperbolic_heads:
+    enabled: false
+    schedule: inverse_power
+    depth_mode: absolute
+    reference_curvature: 1.0
+    reference_depth: 2
+    power: 2.0
+    learnable_curvature: false
+    distance: squared
+    temperature: 0.1
+    loss_coeff: 0.1
+    warmup: true
+    freeze_previous: true
+
+  # Progressive stacking for a 6-layer SASRec. The stage structure and the
+  # epoch budget are identical to the AdamW StackRec experiment; only the
+  # optimizer and its depth-scaled LRs differ.
+  stages:
+    - name: "2_layers"
+      active_layers: [4, 5]
+      new_layers: []
+      final_scales: [0.0, 0.0, 0.0, 0.0, 1.0, 1.0]
+      copy_layers: []
+      muon_lr: 0.028284271247461905
+      adamw_lr: 0.0029702675855218593
+      epochs: 90
+      ramp_epochs: 0
+
+    - name: "4_layers"
+      active_layers: [2, 3, 4, 5]
+      new_layers: [2, 3]
+      final_scales: [0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+      copy_layers: [[4, 2], [5, 3]]
+      muon_lr: 0.02
+      adamw_lr: 0.0021002963516611
+      epochs: 60
+      ramp_epochs: 10
+
+    - name: "6_layers"
+      active_layers: [0, 1, 2, 3, 4, 5]
+      new_layers: [0, 1]
+      final_scales: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      copy_layers: [[2, 0], [3, 1]]
+      muon_lr: 0.016329931618554522
+      adamw_lr: 0.0017148847900662653
+      epochs: 60
+      ramp_epochs: 10
+
+  results_path: sasrec_stackrec_muon_results.json
+  history_path: stackrec_muon_history.json
+
+loss:
+  _target_: src.loss.LocalObjective
+
+model_name: sasrec

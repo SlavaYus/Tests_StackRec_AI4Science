@@ -1,0 +1,14 @@
+defaults:
+  - beauty_sasrec_stackrec
+  - _self_
+
+hydra:
+  run:
+    dir: outputs/${base_dir}/${model_name}__${dataset.name}__stackrec_hyperbolic__${now:%H-%M-%S}
+
+stackrec:
+  hyperbolic_heads:
+    enabled: true
+  # Separate aggregated outputs so the plain / auxiliary runs stay untouched.
+  results_path: sasrec_stackrec_hyperbolic_results.json
+  history_path: stackrec_hyperbolic_history.json
